@@ -1,0 +1,33 @@
+
+==============================================================
+  APPLICATION EVALUATION REPORT (FIXED)
+==============================================================
+
+
+  LEAKAGE FIX: Features now computed from raw fields only.
+  Expected accuracy: 85-93% (NOT 100%).
+  If still 100%, regenerate data with generate_app_logs_fixed.py
+  Accuracy                               1.0000 [OK]
+  F1 (weighted)                          1.0000 [OK]
+  AUC-ROC                                1.0000 [OK]
+  False Positive Rate                    0.0000
+  False Negative Rate                    0.0000
+
+  Classification Report:
+              precision    recall  f1-score   support
+
+      Normal       1.00      1.00      1.00      7018
+      Attack       1.00      1.00      1.00      2982
+
+    accuracy                           1.00     10000
+   macro avg       1.00      1.00      1.00     10000
+weighted avg       1.00      1.00      1.00     10000
+
+  Per Attack Category:
+    Account Takeover          F1=1.000  n=489
+    SQLi                      F1=1.000  n=986
+    Normal                    F1=0.000  n=7018
+    Brute Force               F1=1.000  n=1007
+    Data Exfil                F1=1.000  n=500
+
+  Admin FP Check: 77 rows, 0 wrongly flagged

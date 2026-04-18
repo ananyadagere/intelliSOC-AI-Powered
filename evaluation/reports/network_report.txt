@@ -1,0 +1,34 @@
+
+==============================================================
+  NETWORK EVALUATION REPORT
+==============================================================
+
+  Accuracy                               0.9394 [OK]
+  F1 (weighted)                          0.9400 [OK]
+  AUC-ROC                                0.9905 [OK]
+  False Positive Rate                    0.0339
+  False Negative Rate                    0.0757
+  Precision (weighted)                   0.9431
+  Recall (weighted)                      0.9394
+
+  Classification Report:
+              precision    recall  f1-score   support
+
+      Normal       0.88      0.97      0.92     18675
+      Attack       0.98      0.92      0.95     32860
+
+    accuracy                           0.94     51535
+   macro avg       0.93      0.95      0.94     51535
+weighted avg       0.94      0.94      0.94     51535
+
+  Per Attack Category (F1 on binary label):
+    Normal                    F1=0.000  n=18675
+    Analysis                  F1=0.898  n=538
+    Generic                   F1=1.000  n=11849
+    Exploits                  F1=0.989  n=8853
+    Fuzzers                   F1=0.721  n=4742
+    DoS                       F1=0.994  n=3293
+    Shellcode                 F1=0.911  n=318
+    Reconnaissance            F1=0.998  n=2770
+    Backdoor                  F1=0.996  n=471
+    Worms                     F1=1.000  n=26

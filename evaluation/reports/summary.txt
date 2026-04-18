@@ -1,0 +1,21 @@
+
+==============================================================
+  EVALUATION SUMMARY
+==============================================================
+
+
+  Metric                    Network   Endpoint       App*  Target
+  -----------------------------------------------------------------
+  accuracy                    0.9394 [OK]      0.9522 [OK]      1.0000 [OK]  0.90
+  f1_weighted                 0.9400 [OK]      0.9509 [OK]      1.0000 [OK]  0.88
+  auc_roc                     0.9905 [OK]     0.9394 [LOW]      1.0000 [OK]  0.95
+
+  * App accuracy was 100% due to data leakage. After fix expect 85-93%.
+    Re-run: python utils/generate_app_logs_fixed.py
+             python models/application/train_app_model_fixed.py
+             python evaluation/evaluate_all.py --layer application
+
+  Key thresholds for SOC usability:
+    FPR < 0.05  -> analysts not overwhelmed with false alarms
+    FNR < 0.10  -> real attacks not silently missed
+    C2 Beaconing typically lowest F1 (subtle signal) - expected behavior

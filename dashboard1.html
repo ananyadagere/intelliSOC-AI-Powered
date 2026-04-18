@@ -1,0 +1,1372 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>intelliSOC — Threat Detection Engine v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;600;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#020608;--bg1:#050d12;--bg2:#081520;--panel:#0a1c28;
+    --border:#0d3347;--cyan:#00e5ff;--cyan-dim:#00b8cc;
+    --green:#00ff88;--green-dim:#00cc6a;--red:#ff2d55;
+    --orange:#ff8c00;--yellow:#ffd700;--purple:#bc00ff;
+    --text:#c8dde8;--text-dim:#567085;
+    --critical:#ff2d55;--high:#ff8c00;--medium:#ffd700;--low:#00e5ff;--normal:#00ff88;
+    --glow-c:0 0 20px #00e5ff66,0 0 40px #00e5ff22;
+    --glow-g:0 0 20px #00ff8866,0 0 40px #00ff8822;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;font-weight:300;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.012) 2px,rgba(0,229,255,0.012) 4px);pointer-events:none;z-index:9999;}
+  #topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:linear-gradient(90deg,#020d14,#071a24 50%,#020d14);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+  .logo{font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:900;letter-spacing:0.3em;color:var(--cyan);text-shadow:var(--glow-c);display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:26px;height:26px;border:2px solid var(--cyan);transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:var(--glow-c);animation:pulse-border 2s ease-in-out infinite;}
+  @keyframes pulse-border{0%,100%{box-shadow:var(--glow-c);}50%{box-shadow:0 0 30px #00e5ffaa,0 0 60px #00e5ff44;}}
+  .logo-dot{width:7px;height:7px;background:var(--cyan);transform:rotate(-45deg);animation:pulse-dot 2s ease-in-out infinite;}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.4;}}
+  #clock{font-family:'Share Tech Mono',monospace;font-size:0.82rem;color:var(--text-dim);letter-spacing:0.1em;}
+  #status-bar{display:flex;gap:14px;align-items:center;font-size:0.68rem;font-family:'Share Tech Mono',monospace;}
+  .status-item{display:flex;align-items:center;gap:5px;color:var(--text-dim);}
+  .status-dot{width:7px;height:7px;border-radius:50%;animation:blink 1.4s ease-in-out infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+  .status-dot.online{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .status-dot.warn{background:var(--orange);animation-duration:0.5s;}
+  #api-config{display:flex;gap:8px;align-items:center;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);}
+  #api-url{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.73rem;padding:5px 10px;outline:none;}
+  #api-url:focus{border-color:var(--cyan);}
+  .ctrl-btn{font-family:'Orbitron',monospace;font-size:0.56rem;letter-spacing:0.1em;padding:5px 11px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:all 0.2s;text-transform:uppercase;}
+  .ctrl-btn:hover{border-color:var(--cyan);color:var(--cyan);}
+  .ctrl-btn.green{border-color:var(--green-dim);color:var(--green);}
+  .ctrl-btn.green:hover{background:rgba(0,255,136,0.08);box-shadow:var(--glow-g);}
+  .ctrl-btn.amber{border-color:var(--orange);color:var(--orange);}
+  .ctrl-btn.red-btn{border-color:var(--red);color:var(--red);}
+  #conn-status{font-family:'Share Tech Mono',monospace;font-size:0.63rem;display:flex;align-items:center;gap:5px;}
+
+  /* SIM BAR */
+  #sim-bar{padding:5px 14px;background:linear-gradient(90deg,rgba(0,255,136,0.06),rgba(0,229,255,0.02));border-bottom:1px solid rgba(0,255,136,0.25);display:none;align-items:center;gap:12px;font-family:'Share Tech Mono',monospace;font-size:0.66rem;}
+  #sim-bar.active{display:flex;}
+  .sim-pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 0.5s ease-in-out infinite;flex-shrink:0;}
+  #sim-speed{width:100px;accent-color:var(--cyan);}
+  #sim-scenario-name{color:var(--cyan);font-size:0.68rem;margin-left:auto;}
+  #sim-event-count{color:var(--text-dim);}
+
+  /* STATS */
+  #stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);}
+  .stat-card{background:var(--bg1);padding:13px 16px;position:relative;overflow:hidden;}
+  .stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--card-accent,var(--cyan));}
+  .stat-label{font-family:'Share Tech Mono',monospace;font-size:0.58rem;letter-spacing:0.15em;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;}
+  .stat-value{font-family:'Orbitron',monospace;font-size:1.8rem;font-weight:600;line-height:1;transition:all 0.3s ease;}
+  .stat-sub{font-family:'Share Tech Mono',monospace;font-size:0.56rem;color:var(--text-dim);margin-top:3px;}
+
+  /* MAIN */
+  #main{display:grid;grid-template-columns:268px 1fr 330px;gap:1px;background:var(--border);min-height:calc(100vh - 135px);}
+  .panel{background:var(--bg1);padding:16px;position:relative;overflow:hidden;}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.35;}
+  .panel-title{font-family:'Orbitron',monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.25em;color:var(--cyan);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .panel-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent);}
+  #sidebar-left{grid-row:1/3;display:flex;flex-direction:column;gap:1px;}
+
+  /* LAYER TABS */
+  .layer-tabs{display:flex;gap:3px;margin-bottom:12px;}
+  .layer-tab{font-family:'Orbitron',monospace;font-size:0.56rem;font-weight:600;letter-spacing:0.12em;padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.2s;text-transform:uppercase;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);}
+  .layer-tab:hover{border-color:var(--cyan-dim);color:var(--cyan);}
+  .layer-tab.active{border-color:var(--cyan);background:rgba(0,229,255,0.08);color:var(--cyan);}
+
+  /* FORMS */
+  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:10px;}
+  .form-group{display:flex;flex-direction:column;gap:4px;}
+  .form-group label{font-family:'Share Tech Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;color:var(--text-dim);text-transform:uppercase;}
+  .form-group input,.form-group select{background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:0.76rem;padding:5px 9px;outline:none;transition:border-color 0.2s;width:100%;}
+  .form-group input:focus,.form-group select:focus{border-color:var(--cyan);}
+  .form-group select option{background:var(--bg2);}
+
+  /* ADMIN OVERRIDE */
+  #admin-override{margin-bottom:10px;border:1px solid rgba(255,215,0,0.25);background:rgba(255,215,0,0.03);padding:9px 11px;}
+  .admin-panel-title{font-family:'Orbitron',monospace;font-size:0.56rem;font-weight:600;letter-spacing:0.2em;color:var(--yellow);text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:6px;}
+  .admin-panel-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,215,0,0.3),transparent);}
+  .admin-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .admin-check-label{display:flex;align-items:center;gap:5px;font-family:'Share Tech Mono',monospace;font-size:0.66rem;color:var(--text-dim);cursor:pointer;}
+  .admin-check-label input[type=checkbox]{accent-color:var(--yellow);width:13px;height:13px;}
+  #admin-username{background:var(--bg);border:1px solid rgba(255,215,0,0.25);color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:0.7rem;padding:4px 8px;outline:none;width:130px;}
+  #fp-cap-notice{color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:0.62rem;margin-top:5px;display:none;padding:4px 0;}
+  #fp-override-notice{border:1px solid var(--orange);background:rgba(255,140,0,0.05);padding:7px 9px;margin-bottom:8px;display:none;font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:var(--orange);}
+
+  /* SUBMIT */
+  #submit-btn{font-family:'Orbitron',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.2em;padding:10px 26px;background:transparent;border:1px solid var(--cyan);color:var(--cyan);cursor:pointer;position:relative;overflow:hidden;transition:all 0.3s;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%);text-transform:uppercase;}
+  #submit-btn::before{content:'';position:absolute;inset:0;background:var(--cyan);transform:scaleX(0);transform-origin:left;transition:transform 0.3s;z-index:-1;}
+  #submit-btn:hover{color:var(--bg);box-shadow:var(--glow-c);}
+  #submit-btn:hover::before{transform:scaleX(1);}
+  #submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  #submit-btn.loading{animation:btn-pulse 0.7s ease-in-out infinite alternate;}
+  @keyframes btn-pulse{from{box-shadow:0 0 4px var(--cyan);}to{box-shadow:0 0 20px var(--cyan),0 0 40px rgba(0,229,255,0.3);}}
+
+  /* RESULT PANEL */
+  #result-panel{background:var(--bg2);border:1px solid var(--border);padding:12px;margin-top:10px;display:none;animation:fadeIn 0.4s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .result-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px;}
+  .result-cat-block{display:flex;flex-direction:column;gap:4px;}
+  .severity-badge{font-family:'Orbitron',monospace;font-size:0.6rem;font-weight:600;letter-spacing:0.2em;padding:3px 11px;border:1px solid currentColor;text-transform:uppercase;}
+  .badge-CRITICAL{color:var(--critical);box-shadow:0 0 10px rgba(255,45,85,0.35);animation:critical-flash 0.4s ease infinite alternate;}
+  .badge-HIGH{color:var(--high);box-shadow:0 0 7px rgba(255,140,0,0.25);}
+  .badge-MEDIUM{color:var(--medium);}
+  .badge-LOW{color:var(--low);}
+  .badge-NORMAL{color:var(--normal);}
+  @keyframes critical-flash{from{opacity:0.8}to{opacity:1}}
+  .score-gauge{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .gauge-track{flex:1;height:4px;background:var(--border);}
+  .gauge-fill{height:100%;transition:width 0.8s cubic-bezier(0.23,1,0.32,1);position:relative;}
+  .gauge-fill::after{content:'';position:absolute;right:0;top:-2px;width:7px;height:7px;border-radius:50%;background:inherit;filter:brightness(1.5);}
+  .gauge-val{font-family:'Orbitron',monospace;font-size:1.05rem;font-weight:600;min-width:50px;text-align:right;}
+  .result-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:9px;}
+  .result-item{background:var(--panel);padding:7px 9px;border-left:2px solid var(--border);}
+  .result-item-label{font-family:'Share Tech Mono',monospace;font-size:0.55rem;letter-spacing:0.1em;color:var(--text-dim);text-transform:uppercase;margin-bottom:2px;}
+  .result-item-value{font-family:'Share Tech Mono',monospace;font-size:0.78rem;color:var(--text);}
+
+  /* DYNAMIC THREAT MSG */
+  #threat-message{border:1px solid rgba(0,229,255,0.2);background:rgba(0,229,255,0.03);padding:9px 11px;margin-bottom:9px;font-family:'Share Tech Mono',monospace;font-size:0.7rem;line-height:1.65;color:var(--text);display:none;}
+  #threat-message .msg-label{color:var(--cyan);font-size:0.56rem;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:4px;}
+
+  /* CROSS-LAYER */
+  #cross-layer-badge{display:none;font-family:'Share Tech Mono',monospace;font-size:0.63rem;padding:4px 10px;border:1px solid var(--purple);color:var(--purple);background:rgba(188,0,255,0.07);margin-bottom:7px;animation:fadeIn 0.3s ease;}
+  #fp-override-notice{border:1px solid var(--orange);background:rgba(255,140,0,0.05);padding:7px 10px;margin-bottom:8px;display:none;font-family:'Share Tech Mono',monospace;font-size:0.64rem;color:var(--orange);}
+
+  /* SHAP */
+  .shap-row{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-family:'Share Tech Mono',monospace;font-size:0.68rem;}
+  .shap-label{color:var(--text-dim);flex:0 0 170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .shap-bar-track{flex:1;height:3px;background:var(--border);}
+  .shap-bar-fill{height:100%;transition:width 0.6s ease;}
+  .shap-val{min-width:48px;text-align:right;}
+  .playbook-box{background:var(--panel);border:1px solid var(--border);padding:10px 12px;font-family:'Share Tech Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--text);white-space:pre-wrap;max-height:160px;overflow-y:auto;margin-top:6px;}
+  .playbook-box::-webkit-scrollbar{width:3px;}
+  .playbook-box::-webkit-scrollbar-thumb{background:var(--border);}
+
+  /* ALERT FEED */
+  #alert-feed{overflow-y:auto;max-height:calc(100vh - 300px);}
+  #alert-feed::-webkit-scrollbar{width:3px;}
+  #alert-feed::-webkit-scrollbar-thumb{background:var(--border);}
+  .alert-item{border-left:2px solid var(--border);padding:9px 11px;margin-bottom:5px;background:var(--bg2);cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;animation:slideIn 0.3s ease;}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+  .alert-item:hover{background:rgba(0,229,255,0.04);}
+  .alert-item.sev-CRITICAL{border-left-color:var(--critical);}
+  .alert-item.sev-HIGH{border-left-color:var(--high);}
+  .alert-item.sev-MEDIUM{border-left-color:var(--medium);}
+  .alert-item.sev-LOW{border-left-color:var(--low);}
+  .alert-item.sev-NORMAL{border-left-color:var(--normal);}
+  .alert-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+  .alert-cat{font-family:'Orbitron',monospace;font-size:0.56rem;font-weight:600;letter-spacing:0.12em;color:var(--cyan);}
+  .alert-time{font-family:'Share Tech Mono',monospace;font-size:0.58rem;color:var(--text-dim);}
+  .mini-bar{flex:1;height:2px;background:var(--border);}
+  .mini-bar-fill{height:100%;transition:width 0.5s ease;}
+  .alert-score-row{display:flex;align-items:center;gap:7px;}
+  .alert-score-text{font-family:'Orbitron',monospace;font-size:0.6rem;min-width:36px;text-align:right;}
+  .alert-layer{font-family:'Share Tech Mono',monospace;font-size:0.57rem;color:var(--text-dim);margin-top:2px;}
+
+  /* TERMINAL */
+  #terminal{font-family:'Share Tech Mono',monospace;font-size:0.68rem;line-height:1.55;color:var(--green);overflow-y:auto;max-height:175px;padding:9px;background:var(--bg);border:1px solid var(--border);}
+  #terminal::-webkit-scrollbar{width:3px;}
+  #terminal::-webkit-scrollbar-thumb{background:var(--border);}
+  .term-ts{color:var(--text-dim);}
+  .term-ok{color:var(--green);}
+  .term-err{color:var(--red);}
+  .term-warn{color:var(--orange);}
+  .term-info{color:var(--cyan);}
+
+  /* MAP */
+  #threat-map{background:var(--bg);border:1px solid var(--border);height:148px;position:relative;overflow:hidden;margin-bottom:11px;}
+  #map-canvas{width:100%;height:100%;}
+
+  /* CAT BARS */
+  .cat-bar-row{display:flex;align-items:center;gap:7px;margin-bottom:6px;font-family:'Share Tech Mono',monospace;font-size:0.61rem;}
+  .cat-name{width:95px;color:var(--text-dim);}
+  .cat-track{flex:1;height:4px;background:var(--border);}
+  .cat-fill{height:100%;transition:width 0.6s ease;}
+  .cat-count{width:26px;text-align:right;color:var(--text-dim);}
+
+  /* FP BADGE */
+  .fp-badge{display:inline-block;font-family:'Share Tech Mono',monospace;font-size:0.58rem;padding:2px 7px;border:1px solid var(--yellow);color:var(--yellow);}
+
+  /* GUIDE */
+  #guide-panel{grid-column:1/-1;background:var(--bg1);border-top:1px solid var(--border);padding:16px 22px;display:none;}
+  #guide-panel.show{display:block;animation:fadeIn 0.3s ease;}
+  .guide-step{display:flex;gap:14px;margin-bottom:12px;align-items:flex-start;}
+  .guide-num{font-family:'Orbitron',monospace;font-size:0.65rem;color:var(--bg);background:var(--cyan);width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:600;}
+  .guide-content{font-size:0.78rem;line-height:1.6;}
+  .guide-content strong{color:var(--cyan);font-weight:400;}
+  .guide-code{background:var(--bg);border:1px solid var(--border);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:0.66rem;color:var(--green);margin-top:5px;display:block;}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-icon"><div class="logo-dot"></div></div>
+    intelliSOC
+  </div>
+  <div id="clock">--:--:-- UTC</div>
+  <div id="status-bar">
+    <div class="status-item">
+      <div class="status-dot" id="api-dot" style="background:var(--text-dim)"></div>
+      <span id="api-label">API OFFLINE</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot" id="sim-dot" style="background:var(--text-dim)"></div>
+      <span id="sim-label">SIM IDLE</span>
+    </div>
+    <button class="ctrl-btn" onclick="toggleGuide()">GUIDE</button>
+    <button class="ctrl-btn green" id="sim-toggle-btn" onclick="toggleSimulation()">&#9654; SIMULATE</button>
+  </div>
+</div>
+
+<!-- API CONFIG -->
+<div id="api-config">
+  <span style="font-family:'Share Tech Mono',monospace;font-size:0.68rem;color:var(--text-dim);letter-spacing:0.1em;">API:</span>
+  <input type="text" id="api-url" value="http://localhost:8000" placeholder="http://localhost:8000">
+  <button class="ctrl-btn" onclick="testConnection()">TEST CONNECTION</button>
+  <div id="conn-status">
+    <div class="status-dot" id="conn-dot" style="background:var(--text-dim);animation:none"></div>
+    <span id="conn-text" style="color:var(--text-dim)">NOT CONNECTED</span>
+  </div>
+  <span style="color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:0.6rem;margin-left:8px;" id="offline-note">[ OFFLINE MODE ACTIVE — simulation runs without backend ]</span>
+</div>
+
+<!-- SIM STATUS BAR -->
+<div id="sim-bar">
+  <div class="sim-pulse"></div>
+  <span style="color:var(--green)">LIVE SIMULATION</span>
+  <span style="color:var(--text-dim)">speed:</span>
+  <input type="range" id="sim-speed" min="500" max="5000" value="2000" step="500" oninput="updateSimSpeed()">
+  <span id="sim-speed-val" style="color:var(--cyan);font-size:0.66rem">2.0s</span>
+  <span id="sim-event-count" style="color:var(--text-dim)">events: 0</span>
+  <span id="sim-scenario-name">—</span>
+  <button class="ctrl-btn red-btn" style="margin-left:8px;font-size:0.54rem;padding:3px 9px;" onclick="toggleSimulation()">STOP</button>
+</div>
+
+<!-- STATS ROW -->
+<div id="stats-row">
+  <div class="stat-card" style="--card-accent:var(--red)">
+    <div class="stat-label">TOTAL ALERTS</div>
+    <div class="stat-value" id="stat-total" style="color:var(--red)">0</div>
+    <div class="stat-sub">ALL SEVERITIES</div>
+  </div>
+  <div class="stat-card" style="--card-accent:var(--critical)">
+    <div class="stat-label">CRITICAL</div>
+    <div class="stat-value" id="stat-critical" style="color:var(--critical)">0</div>
+    <div class="stat-sub">SCORE &gt; 0.85</div>
+  </div>
+  <div class="stat-card" style="--card-accent:var(--orange)">
+    <div class="stat-label">HIGH</div>
+    <div class="stat-value" id="stat-high" style="color:var(--orange)">0</div>
+    <div class="stat-sub">SCORE 0.60–0.85</div>
+  </div>
+  <div class="stat-card" style="--card-accent:var(--yellow)">
+    <div class="stat-label">FP SUPPRESSED</div>
+    <div class="stat-value" id="stat-fp" style="color:var(--yellow)">0</div>
+    <div class="stat-sub">CAPPED AT MEDIUM</div>
+  </div>
+  <div class="stat-card" style="--card-accent:var(--purple)">
+    <div class="stat-label">CROSS-LAYER</div>
+    <div class="stat-value" id="stat-cross" style="color:var(--purple)">0</div>
+    <div class="stat-sub">+20% CORRELATED</div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div id="main">
+
+  <!-- LEFT SIDEBAR -->
+  <div id="sidebar-left">
+    <div class="panel" style="flex:1">
+      <div class="panel-title">THREAT MAP</div>
+      <div id="threat-map"><canvas id="map-canvas"></canvas></div>
+      <div class="panel-title" style="margin-top:10px">CATEGORY BREAKDOWN</div>
+      <div id="cat-bars">
+        <div class="cat-bar-row"><div class="cat-name">Brute Force</div><div class="cat-track"><div class="cat-fill" id="bar-bf" style="width:0%;background:var(--red)"></div></div><div class="cat-count" id="cnt-bf">0</div></div>
+        <div class="cat-bar-row"><div class="cat-name">C2 Beaconing</div><div class="cat-track"><div class="cat-fill" id="bar-c2" style="width:0%;background:var(--purple)"></div></div><div class="cat-count" id="cnt-c2">0</div></div>
+        <div class="cat-bar-row"><div class="cat-name">Data Exfil</div><div class="cat-track"><div class="cat-fill" id="bar-ex" style="width:0%;background:var(--orange)"></div></div><div class="cat-count" id="cnt-ex">0</div></div>
+        <div class="cat-bar-row"><div class="cat-name">Lateral Move</div><div class="cat-track"><div class="cat-fill" id="bar-lm" style="width:0%;background:var(--yellow)"></div></div><div class="cat-count" id="cnt-lm">0</div></div>
+        <div class="cat-bar-row"><div class="cat-name">SQLi / Inject</div><div class="cat-track"><div class="cat-fill" id="bar-sq" style="width:0%;background:var(--cyan)"></div></div><div class="cat-count" id="cnt-sq">0</div></div>
+        <div class="cat-bar-row"><div class="cat-name">Acct Takeover</div><div class="cat-track"><div class="cat-fill" id="bar-at" style="width:0%;background:var(--green)"></div></div><div class="cat-count" id="cnt-at">0</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">TERMINAL</div>
+      <div id="terminal">
+        <div><span class="term-ts">[BOOT]</span> <span class="term-info">intelliSOC v2.0 initializing...</span></div>
+        <div><span class="term-ts">[BOOT]</span> <span class="term-ok">Detection engine loaded — ML + Rule-based</span></div>
+        <div><span class="term-ts">[BOOT]</span> <span class="term-warn">Offline mode — simulation available without backend</span></div>
+        <div><span class="term-ts">[BOOT]</span> <span class="term-info">Admin FP cap: ACTIVE — override flag available</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: INGEST -->
+  <div class="panel" id="ingest-panel">
+    <div class="panel-title">EVENT INGESTION</div>
+
+    <div class="layer-tabs">
+      <button class="layer-tab active" onclick="switchTab('network',this)">&#9670; NETWORK</button>
+      <button class="layer-tab" onclick="switchTab('endpoint',this)">&#9670; ENDPOINT</button>
+      <button class="layer-tab" onclick="switchTab('application',this)">&#9670; APPLICATION</button>
+    </div>
+
+    <!-- NETWORK FORM -->
+    <div id="form-network">
+      <div class="form-grid">
+        <div class="form-group"><label>SRC IP</label><input id="n-src_ip" value="192.168.1.100"></div>
+        <div class="form-group"><label>DST IP</label><input id="n-dst_ip" value="8.8.8.8"></div>
+        <div class="form-group"><label>PROTOCOL</label><select id="n-proto"><option>tcp</option><option>udp</option><option>icmp</option></select></div>
+        <div class="form-group"><label>OUTBOUND BYTES</label><input id="n-sbytes" type="number" value="50000"></div>
+        <div class="form-group"><label>INBOUND BYTES</label><input id="n-dbytes" type="number" value="1000"></div>
+        <div class="form-group"><label>PACKET RATE</label><input id="n-rate" type="number" value="200"></div>
+        <div class="form-group"><label>DURATION (s)</label><input id="n-dur" type="number" step="0.01" value="0.5"></div>
+        <div class="form-group"><label>FAILED LOGINS/60s</label><input id="n-failed" type="number" value="0"></div>
+        <div class="form-group"><label>BEACON JITTER %</label><input id="n-jitter" type="number" value="100"></div>
+      </div>
+    </div>
+
+    <!-- ENDPOINT FORM -->
+    <div id="form-endpoint" style="display:none">
+      <div class="form-grid">
+        <div class="form-group"><label>HOSTNAME</label><input id="e-hostname" value="WORKSTATION-001"></div>
+        <div class="form-group"><label>USERNAME</label><input id="e-username" value="jdoe"></div>
+        <div class="form-group"><label>PROCESS NAME</label><input id="e-process_name" value="powershell.exe"></div>
+        <div class="form-group"><label>PARENT PROCESS</label><input id="e-parent_process" value="cmd.exe"></div>
+        <div class="form-group"><label>EVENT TYPE</label><select id="e-event_type"><option>process_start</option><option>failed_login</option><option>file_transfer</option><option>network_connect</option><option>registry_write</option></select></div>
+        <div class="form-group"><label>BYTES SENT</label><input id="e-bytes_sent" type="number" value="1000"></div>
+        <div class="form-group"><label>DST IP</label><input id="e-dst_ip" value="10.0.0.5"></div>
+        <div class="form-group"><label>DST PORT</label><input id="e-dst_port" type="number" value="445"></div>
+        <div class="form-group"><label>IS EXTERNAL DST</label><select id="e-is_ext"><option value="false">No (internal)</option><option value="true">Yes (external)</option></select></div>
+      </div>
+    </div>
+
+    <!-- APPLICATION FORM -->
+    <div id="form-application" style="display:none">
+      <div class="form-grid">
+        <div class="form-group"><label>SRC IP</label><input id="a-src_ip" value="5.6.7.8"></div>
+        <div class="form-group"><label>USER AGENT</label><input id="a-user_agent" value="Mozilla/5.0 Chrome/121"></div>
+        <div class="form-group"><label>METHOD</label><select id="a-method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select></div>
+        <div class="form-group"><label>ENDPOINT</label><input id="a-endpoint" value="/api/users?id=1"></div>
+        <div class="form-group"><label>STATUS CODE</label><input id="a-status_code" type="number" value="200"></div>
+        <div class="form-group"><label>PAYLOAD SIZE</label><input id="a-payload_size" type="number" value="1200"></div>
+        <div class="form-group"><label>GEO COUNTRY</label><input id="a-geo_country" value="IN"></div>
+        <div class="form-group"><label>USER ID</label><input id="a-user_id" value="user_0042"></div>
+      </div>
+    </div>
+
+    <!-- ADMIN OVERRIDE -->
+    <div id="admin-override">
+      <div class="admin-panel-title">&#9888; ADMIN FALSE-POSITIVE OVERRIDE</div>
+      <div class="admin-row">
+        <label class="admin-check-label">
+          <input type="checkbox" id="is-admin" onchange="onAdminToggle()">
+          Known-safe admin user
+        </label>
+        <input type="text" id="admin-username" placeholder="admin / sysadmin / backup_user" value="admin">
+        <label class="admin-check-label" id="override-rule-wrap" style="display:none">
+          <input type="checkbox" id="override-fp-cap" onchange="onOverrideToggle()">
+          Override FP cap (rule violation detected)
+        </label>
+      </div>
+      <div id="fp-cap-notice">&#9888; FP cap ACTIVE: score will be capped at Medium (0.59) unless override is checked</div>
+    </div>
+
+    <!-- PRESETS & SUBMIT -->
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+      <button id="submit-btn" onclick="submitEvent()">&#9654; ANALYZE THREAT</button>
+      <button onclick="fillPreset('brute_force')" style="font-family:'Share Tech Mono',monospace;font-size:0.61rem;padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;" onmouseover="this.style.borderColor='var(--red)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">PRESET: BRUTE FORCE</button>
+      <button onclick="fillPreset('c2')" style="font-family:'Share Tech Mono',monospace;font-size:0.61rem;padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;" onmouseover="this.style.borderColor='var(--purple)';this.style.color='var(--purple)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">PRESET: C2 BEACON</button>
+      <button onclick="fillPreset('exfil')" style="font-family:'Share Tech Mono',monospace;font-size:0.61rem;padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">PRESET: EXFIL</button>
+      <button onclick="fillPreset('lateral')" style="font-family:'Share Tech Mono',monospace;font-size:0.61rem;padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">PRESET: LATERAL MOVE</button>
+      <button onclick="fillPreset('fp_admin')" style="font-family:'Share Tech Mono',monospace;font-size:0.61rem;padding:7px 10px;background:transparent;border:1px solid var(--border);color:var(--text-dim);cursor:pointer;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-dim)'">PRESET: FP (ADMIN BULK)</button>
+    </div>
+
+    <!-- RESULT PANEL -->
+    <div id="result-panel">
+      <div id="fp-override-notice">&#9888; ADMIN OVERRIDE ACTIVE — FP cap bypassed, actual ML score shown</div>
+      <div id="cross-layer-badge">&#9670; CROSS-LAYER CORRELATION: +20% boost applied (multi-layer threat confirmed)</div>
+
+      <div class="result-header">
+        <div class="result-cat-block">
+          <div style="font-family:'Orbitron',monospace;font-size:0.9rem;font-weight:600;color:var(--text)" id="res-cat">—</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:0.65rem;color:var(--text-dim);margin-top:2px" id="res-mitre">MITRE N/A</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+          <div id="res-sev" class="severity-badge">—</div>
+          <span id="res-fp-badge" class="fp-badge" style="display:none">&#9888; FP CANDIDATE</span>
+        </div>
+      </div>
+      <div class="score-gauge">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:0.6rem;color:var(--text-dim)">FUSION SCORE</span>
+        <div class="gauge-track"><div class="gauge-fill" id="gauge-fill" style="width:0%"></div></div>
+        <div class="gauge-val" id="gauge-val">0.000</div>
+      </div>
+
+      <div id="threat-message">
+        <div class="msg-label">&#9670; THREAT ASSESSMENT</div>
+        <div id="threat-msg-text"></div>
+      </div>
+
+      <div class="result-grid">
+        <div class="result-item"><div class="result-item-label">ML PROBABILITY</div><div class="result-item-value" id="res-ml">—</div></div>
+        <div class="result-item"><div class="result-item-label">RULE FIRED</div><div class="result-item-value" id="res-rule">—</div></div>
+        <div class="result-item"><div class="result-item-label">LAYERS ACTIVE</div><div class="result-item-value" id="res-layers">—</div></div>
+        <div class="result-item"><div class="result-item-label">PROCESSING</div><div class="result-item-value" id="res-time">—</div></div>
+        <div class="result-item"><div class="result-item-label">RAW SCORE</div><div class="result-item-value" id="res-raw-score">—</div></div>
+        <div class="result-item"><div class="result-item-label">FP CAPPED</div><div class="result-item-value" id="res-fp-capped">—</div></div>
+      </div>
+
+      <div id="shap-section" style="display:none">
+        <div style="font-family:'Orbitron',monospace;font-size:0.56rem;letter-spacing:0.2em;color:var(--cyan);margin-bottom:7px">TOP SHAP FEATURES</div>
+        <div id="shap-list"></div>
+      </div>
+
+      <div id="playbook-section" style="display:none">
+        <div style="font-family:'Orbitron',monospace;font-size:0.56rem;letter-spacing:0.2em;color:var(--green);margin-bottom:4px">PREVENTION PLAYBOOK</div>
+        <div class="playbook-box" id="playbook-text"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: ALERTS -->
+  <div class="panel" id="sidebar-right">
+    <div class="panel-title">INCIDENT FEED</div>
+    <div id="alert-feed">
+      <div style="text-align:center;color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:0.7rem;padding:20px 0;">No alerts yet — analyze an event or start simulation</div>
+    </div>
+  </div>
+
+  <!-- GUIDE -->
+  <div id="guide-panel">
+    <div style="font-family:'Orbitron',monospace;font-size:0.62rem;font-weight:600;letter-spacing:0.2em;color:var(--cyan);margin-bottom:12px">BACKEND CONNECTION GUIDE</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div class="guide-step">
+          <div class="guide-num">1</div>
+          <div class="guide-content">
+            <strong>Install dependencies:</strong><br>
+            <code class="guide-code">pip install fastapi uvicorn lightgbm scikit-learn shap pandas numpy joblib</code>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-num">2</div>
+          <div class="guide-content">
+            <strong>Enable CORS in api/main.py</strong> — add after app = FastAPI(...):
+            <code class="guide-code">from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])</code>
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-num">3</div>
+          <div class="guide-content">
+            <strong>Start the backend:</strong>
+            <code class="guide-code">uvicorn api.main:app --reload --port 8000</code>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="guide-step">
+          <div class="guide-num">4</div>
+          <div class="guide-content">
+            <strong>fusion.py cross-layer boost</strong> — the dashboard will send layer_results with non-null values for each active layer. The +20% boost fires when 2+ layers have score &gt; 0.4.
+          </div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-num">5</div>
+          <div class="guide-content">
+            <strong>Offline simulation</strong> — click ▶ SIMULATE without a backend. Threats are generated locally using realistic scoring formulas matching your fusion.py logic exactly.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────────
+const state = {
+  apiUrl: 'http://localhost:8000',
+  connected: false,
+  currentLayer: 'network',
+  simRunning: false,
+  simInterval: null,
+  simSpeed: 2000,
+  simEventCount: 0,
+  stats: { total:0, critical:0, high:0, fp:0, cross:0 },
+  cats: { 'Brute Force':0,'C2 Beaconing':0,'Data Exfil':0,'Lateral Movement':0,'SQLi / Inject':0,'Account Takeover':0 },
+  layerWindow: [],  // recent events by layer for cross-layer correlation
+  pendingLayerScores: {} // track last scores per layer
+};
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toUTCString().slice(17,25) + ' UTC';
+}
+setInterval(tickClock, 1000); tickClock();
+
+// ── TERMINAL ──────────────────────────────────────────────────────────────────
+function termLog(msg, type='ok') {
+  const term = document.getElementById('terminal');
+  const now = new Date().toTimeString().slice(0,8);
+  const d = document.createElement('div');
+  d.innerHTML = `<span class="term-ts">[${now}]</span> <span class="term-${type}">${msg}</span>`;
+  term.appendChild(d);
+  term.scrollTop = term.scrollHeight;
+}
+
+// ── CONNECTION ────────────────────────────────────────────────────────────────
+async function testConnection() {
+  const url = document.getElementById('api-url').value.trim();
+  state.apiUrl = url;
+  termLog(`Testing ${url}/health`, 'info');
+  try {
+    const r = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) });
+    const data = await r.json();
+    setConnected(true);
+    termLog(`Connected! models_loaded=${data.models_loaded}`, 'ok');
+    document.getElementById('offline-note').style.display = 'none';
+  } catch(e) {
+    setConnected(false);
+    termLog(`Connection failed: ${e.message} — offline mode active`, 'warn');
+  }
+}
+
+function setConnected(yes) {
+  state.connected = yes;
+  const dot=document.getElementById('conn-dot'), text=document.getElementById('conn-text');
+  const apiDot=document.getElementById('api-dot'), apiLabel=document.getElementById('api-label');
+  if (yes) {
+    dot.style.background='var(--green)'; dot.style.animation='blink 1.4s ease-in-out infinite';
+    text.style.color='var(--green)'; text.textContent='CONNECTED';
+    apiDot.style.background='var(--green)'; apiDot.classList.add('online');
+    apiLabel.textContent='API ONLINE';
+  } else {
+    dot.style.background='var(--red)'; dot.style.animation='blink 0.5s ease-in-out infinite';
+    text.style.color='var(--red)'; text.textContent='OFFLINE';
+    apiDot.style.background='var(--text-dim)'; apiLabel.textContent='API OFFLINE';
+  }
+}
+
+// ── TAB SWITCH ────────────────────────────────────────────────────────────────
+function switchTab(layer, btn) {
+  state.currentLayer = layer;
+  document.querySelectorAll('.layer-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['network','endpoint','application'].forEach(l => {
+    document.getElementById(`form-${l}`).style.display = l===layer ? 'block' : 'none';
+  });
+  document.getElementById('result-panel').style.display = 'none';
+}
+
+// ── ADMIN CONTROLS ────────────────────────────────────────────────────────────
+function onAdminToggle() {
+  const isAdmin = document.getElementById('is-admin').checked;
+  const notice = document.getElementById('fp-cap-notice');
+  const overrideWrap = document.getElementById('override-rule-wrap');
+  notice.style.display = isAdmin ? 'block' : 'none';
+  if (!isAdmin) {
+    document.getElementById('override-fp-cap').checked = false;
+    overrideWrap.style.display = 'none';
+  }
+}
+
+function onOverrideToggle() {
+  const override = document.getElementById('override-fp-cap').checked;
+  const notice = document.getElementById('fp-cap-notice');
+  if (override) {
+    notice.textContent = '⚠ OVERRIDE ON: actual score will be shown — admin may be breaking rules';
+    notice.style.color = 'var(--orange)';
+  } else {
+    notice.textContent = '⚠ FP cap ACTIVE: score will be capped at Medium (0.59) unless override is checked';
+    notice.style.color = 'var(--yellow)';
+  }
+}
+
+function showOverrideWhen(ruleFired) {
+  const isAdmin = document.getElementById('is-admin').checked;
+  const overrideWrap = document.getElementById('override-rule-wrap');
+  if (isAdmin && ruleFired) {
+    overrideWrap.style.display = 'flex';
+  }
+}
+
+// ── FUSION ENGINE (local simulation matching fusion.py) ───────────────────────
+const SAFE_ADMINS = ['admin','sysadmin','backup_user'];
+const SEVERITY_THRESHOLDS = [
+  ['Critical', 0.85, 1.01],
+  ['High',     0.60, 0.85],
+  ['Medium',   0.35, 0.60],
+  ['Low',      0.00, 0.35]
+];
+
+function severityFromScore(s) {
+  for (const [sev, lo, hi] of SEVERITY_THRESHOLDS) if (s >= lo && s < hi) return sev;
+  return 'Low';
+}
+
+function matchesSafeProfile(event) {
+  const uname = (event.username || event.user_id || '');
+  const isInternal = !event.is_external_dst &&
+    (String(event.src_ip||'').startsWith('10.') || String(event.src_ip||'').startsWith('192.168.'));
+  return SAFE_ADMINS.includes(uname) && isInternal;
+}
+
+function computeFusionLocally(ruleResults, mlProb, layerResults, event, shapValues) {
+  const ruleHit = ruleResults.length > 0 ? 1.0 : 0.0;
+  let baseScore = 0.4 * ruleHit + 0.6 * mlProb;
+
+  // Cross-layer boost: +0.2 per additional active layer (matching fusion.py)
+  const activeLayers = Object.entries(layerResults).filter(([,v]) => v !== null && v > 0.4).map(([k]) => k);
+  const layerBoost = Math.max(0, activeLayers.length - 1) * 0.2;
+  let rawScore = Math.min(1.0, baseScore + layerBoost);
+  const crossLayerBoosted = layerBoost > 0;
+
+  // FP suppression — admin known-safe profile
+  let isFP = false;
+  const fpRule = ruleResults.find(r => r.attack_cat === 'False Positive');
+  if (fpRule) { isFP = true; }
+
+  const isAdmin = document.getElementById('is-admin').checked;
+  const adminName = document.getElementById('admin-username').value.trim();
+  const overrideFP = document.getElementById('override-fp-cap').checked;
+
+  let score = rawScore;
+  let fpCapped = false;
+
+  if (isAdmin && SAFE_ADMINS.includes(adminName) && !overrideFP) {
+    // Admin FP suppression — cap at Medium
+    if (matchesSafeProfile({...event, username: adminName})) {
+      isFP = true;
+      if (score > 0.59) { score = 0.59; fpCapped = true; }
+    }
+  }
+  // If override is on, admin breaks rules — show actual raw score
+  if (isAdmin && overrideFP) {
+    score = rawScore;
+    fpCapped = false;
+  }
+
+  const severity = severityFromScore(score);
+  const mitre = ruleResults[0]?.mitre_tag || 'N/A';
+  const attackCat = ruleResults[0]?.attack_cat || inferAttackCat(mlProb, event);
+
+  return {
+    score: Math.round(score * 1000) / 1000,
+    rawScore: Math.round(rawScore * 1000) / 1000,
+    severity,
+    ruleFired: ruleResults.length > 0,
+    mlProbability: Math.round(mlProb * 1000) / 1000,
+    layerCount: activeLayers.length,
+    activeLayers,
+    isFpCandidate: isFP,
+    fpCapped,
+    mitreTag: mitre,
+    attackCat,
+    crossLayerBoosted,
+    layerBoost: Math.round(layerBoost * 100) / 100,
+    explanationFeatures: shapValues.slice(0, 5)
+  };
+}
+
+function inferAttackCat(prob, event) {
+  if (prob < 0.35) return 'Normal';
+  const layer = event.layer || state.currentLayer || 'unknown';
+  // Heuristics
+  if (event.failed_login_rate_60s > 5) return 'Brute Force';
+  if (event.beacon_jitter_pct < 5) return 'C2 Beaconing';
+  if ((event.sbytes || 0) > 1000000) return 'Data Exfil';
+  if (event.dst_port === 445 || event.dst_port === 135) return 'Lateral Movement';
+  if (String(event.endpoint||'').includes('SELECT') || String(event.endpoint||'').includes("'")) return 'SQLi / Inject';
+  return `Anomaly (${layer})`;
+}
+
+// ── RULE ENGINE (simplified local) ────────────────────────────────────────────
+const RULE_CHECKS = [
+  {
+    name: 'brute_force', mitre_tag: 'T1110', attack_cat: 'Brute Force',
+    check: e => (e.failed_login_rate_60s || 0) > 5,
+    weight: 0.9
+  },
+  {
+    name: 'c2_beaconing', mitre_tag: 'T1071', attack_cat: 'C2 Beaconing',
+    check: e => (e.beacon_jitter_pct || 100) < 5 && (e.rate || 0) < 1,
+    weight: 0.85
+  },
+  {
+    name: 'data_exfil', mitre_tag: 'T1048', attack_cat: 'Data Exfil',
+    check: e => (e.sbytes || 0) > 5000000,
+    weight: 0.88
+  },
+  {
+    name: 'lateral_move', mitre_tag: 'T1021', attack_cat: 'Lateral Movement',
+    check: e => [445,135,3389,5985].includes(e.dst_port||0) && String(e.src_ip||'').startsWith('10.'),
+    weight: 0.78
+  },
+  {
+    name: 'sqli', mitre_tag: 'T1190', attack_cat: 'SQLi / Inject',
+    check: e => /SELECT|UNION|DROP|INSERT|'|--|1=1/i.test(e.endpoint||''),
+    weight: 0.92
+  },
+  {
+    name: 'acct_takeover', mitre_tag: 'T1078', attack_cat: 'Account Takeover',
+    check: e => (e.status_code === 403 || e.status_code === 401) && (e.payload_size||0) > 5000,
+    weight: 0.8
+  },
+  {
+    name: 'fp_admin_bulk', mitre_tag: 'N/A', attack_cat: 'False Positive',
+    check: e => SAFE_ADMINS.includes(e.username||e.user_id||'') && (e.sbytes||e.bytes_sent||0) > 100000 && !e.is_external_dst,
+    weight: 0
+  }
+];
+
+function runRuleEngine(event) {
+  return RULE_CHECKS.filter(r => r.check(event));
+}
+
+// ── ML PROBABILITY (local heuristic model) ────────────────────────────────────
+function estimateMLProb(event) {
+  let prob = 0.1;
+  const s = event.sbytes || event.bytes_sent || 0;
+  const flr = event.failed_login_rate_60s || 0;
+  const jitter = event.beacon_jitter_pct !== undefined ? event.beacon_jitter_pct : 100;
+  const rate = event.rate || 0;
+  const status = event.status_code || 200;
+
+  if (flr > 5)  prob += Math.min(0.7, flr * 0.06);
+  if (jitter < 10 && rate < 1) prob += 0.5;
+  if (s > 5000000) prob += Math.min(0.5, s / 20000000);
+  if ([445,135,3389].includes(event.dst_port||0)) prob += 0.3;
+  if (status === 403 || status === 401) prob += 0.2;
+  if (/SELECT|UNION|DROP|'|1=1/i.test(event.endpoint||'')) prob += 0.65;
+  if (s > 100000 && s < 5000000) prob += 0.1;
+
+  // Add realistic noise
+  prob += (Math.random() - 0.5) * 0.08;
+  return Math.min(0.99, Math.max(0.02, prob));
+}
+
+// ── SHAP (synthetic feature attribution) ──────────────────────────────────────
+function generateShap(event, attackCat) {
+  const features = [];
+  if (event.sbytes !== undefined) features.push(['sbytes', (event.sbytes > 1000000 ? 0.6 : 0.1) + Math.random()*0.05]);
+  if (event.failed_login_rate_60s !== undefined) features.push(['failed_login_rate_60s', event.failed_login_rate_60s * 0.05 + Math.random()*0.02]);
+  if (event.beacon_jitter_pct !== undefined) features.push(['beacon_jitter_pct', event.beacon_jitter_pct < 5 ? 0.55 : -0.1]);
+  if (event.rate !== undefined) features.push(['packet_rate', event.rate > 100 ? 0.3 : -0.05]);
+  if (event.dst_port !== undefined) features.push(['dst_port', [445,135,3389].includes(event.dst_port) ? 0.4 : 0.02]);
+  if (event.process_name) features.push(['process_name', ['powershell.exe','cmd.exe','wscript.exe'].includes(event.process_name) ? 0.45 : 0.02]);
+  if (event.bytes_sent !== undefined) features.push(['bytes_sent', event.bytes_sent > 100000 ? 0.35 : 0.05]);
+  if (event.payload_size !== undefined) features.push(['payload_size', event.payload_size > 5000 ? 0.28 : 0.03]);
+  if (event.status_code !== undefined) features.push(['status_code', (event.status_code===403||event.status_code===401) ? 0.25 : -0.02]);
+  features.push(['src_ip_external', event.is_external_dst ? 0.2 : -0.15]);
+  return features.sort((a,b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
+}
+
+// ── DYNAMIC THREAT MESSAGES ────────────────────────────────────────────────────
+const THREAT_MSGS = {
+  'Brute Force': [
+    (e,s) => `Detected ${e.failed_login_rate_60s || '6+'} failed authentications in 60s from ${e.src_ip||'unknown'}. Pattern matches distributed credential stuffing campaign — confidence ${(s*100).toFixed(0)}%. Recommend rate-limit enforcement and CAPTCHA challenge.`,
+    (e,s) => `Automated login attempts from ${e.src_ip||'external'} exceeded threshold. Attack trajectory suggests password spray against multiple accounts. Block source IP and audit affected accounts.`,
+  ],
+  'C2 Beaconing': [
+    (e,s) => `Outbound beacon detected to ${e.dst_ip||'external IP'} with jitter ${e.beacon_jitter_pct||2}% — characteristic of automated C2 checkin. Interval regularity strongly implies implant malware. Isolate endpoint immediately.`,
+    (e,s) => `Low-volume periodic traffic to ${e.dst_ip||'suspicious IP'} at ${e.rate||0.02} pkt/s — matches C2 heartbeat profile. High fusion score ${(s).toFixed(3)} from ML + rule convergence. Activate IR playbook.`,
+  ],
+  'Data Exfil': [
+    (e,s) => `${(e.sbytes/1e6||9.5).toFixed(1)}MB outbound to ${e.dst_ip||'external'} — exceeds 3σ baseline. Exfiltration pattern flagged with ${(s*100).toFixed(0)}% confidence. Block egress, preserve forensic state.`,
+    (e,s) => `Anomalous large outbound transfer detected. Volume ${((e.sbytes||9500000)/1000000).toFixed(1)}MB is ${Math.round((e.sbytes||9500000)/50000)}x above normal baseline. Data classification audit recommended.`,
+  ],
+  'Lateral Movement': [
+    (e,s) => `Internal SMB/RPC traffic from ${e.src_ip||'10.x'} to port ${e.dst_port||445} on ${e.dst_ip||'internal host'}. Post-compromise lateral movement pattern — check for initial compromise on source host first.`,
+    (e,s) => `Suspicious internal east-west traffic on port ${e.dst_port||445}. Matches MITRE T1021 lateral movement via remote services. Correlation with endpoint layer increases confidence significantly.`,
+  ],
+  'SQLi / Inject': [
+    (e,s) => `SQL injection pattern detected in request to ${e.endpoint||'/api/query'}. Payload contains injection keywords. Sanitize all inputs, review WAF rules, check DB query logs for unauthorized reads.`,
+    (e,s) => `Malicious payload signatures in HTTP request — ${e.method||'POST'} to ${e.endpoint||'/api/data'}. Injection attempt may have succeeded if ${e.status_code||200} returned. Audit DB access logs.`,
+  ],
+  'Account Takeover': [
+    (e,s) => `Auth failure (HTTP ${e.status_code||403}) followed by large payload (${e.payload_size||6000}B) from ${e.src_ip||'external'}. Credential theft or session hijack pattern. Force password reset and revoke tokens.`,
+  ],
+  'False Positive': [
+    (e,s) => `Event matches known-safe admin profile. Bulk file operation by '${e.username||'admin'}' from internal network flagged by volume rules — this is expected behavior. Score capped at Medium.`,
+  ],
+  'Normal': [
+    (e,s) => `No significant threat indicators detected. Fusion score ${s.toFixed(3)} falls below detection threshold. Event logged for baseline learning.`,
+  ]
+};
+
+function getDynamicMessage(attackCat, event, score) {
+  const msgs = THREAT_MSGS[attackCat] || THREAT_MSGS['Normal'];
+  const msg = msgs[Math.floor(Math.random() * msgs.length)];
+  return msg(event, score);
+}
+
+// ── PRESETS ───────────────────────────────────────────────────────────────────
+const PRESETS = {
+  brute_force: { tab:'network', data:{ 'n-src_ip':'45.33.32.156','n-dst_ip':'10.0.1.5','n-proto':'tcp','n-sbytes':'800','n-dbytes':'200','n-rate':'15','n-dur':'0.1','n-failed':'12','n-jitter':'100' }},
+  c2:          { tab:'network', data:{ 'n-src_ip':'192.168.5.20','n-dst_ip':'185.220.101.45','n-proto':'tcp','n-sbytes':'450','n-dbytes':'120','n-rate':'0.02','n-dur':'120','n-failed':'0','n-jitter':'2.1' }},
+  exfil:       { tab:'network', data:{ 'n-src_ip':'10.0.2.30','n-dst_ip':'91.108.4.100','n-proto':'tcp','n-sbytes':'9500000','n-dbytes':'500','n-rate':'500','n-dur':'95','n-failed':'0','n-jitter':'100' }},
+  lateral:     { tab:'endpoint', data:{ 'e-hostname':'WORKSTATION-003','e-username':'jdoe','e-process_name':'cmd.exe','e-parent_process':'explorer.exe','e-event_type':'network_connect','e-bytes_sent':'8000','e-dst_ip':'10.0.0.12','e-dst_port':'445','e-is_ext':'false' }},
+  fp_admin:    { tab:'endpoint', data:{ 'e-hostname':'BACKUP-SERVER','e-username':'backup_user','e-process_name':'robocopy.exe','e-parent_process':'taskschd.exe','e-event_type':'file_transfer','e-bytes_sent':'500000','e-dst_ip':'192.168.1.200','e-dst_port':'445','e-is_ext':'false' }, admin:true, adminName:'backup_user' },
+};
+
+function fillPreset(name) {
+  const p = PRESETS[name]; if (!p) return;
+  // Switch tab
+  const tabBtn = document.querySelector(`.layer-tab:nth-child(${['network','endpoint','application'].indexOf(p.tab)+1})`);
+  switchTab(p.tab, tabBtn);
+  // Fill fields
+  Object.entries(p.data).forEach(([id,val]) => { const el=document.getElementById(id); if(el) el.value=val; });
+  // Admin toggle
+  if (p.admin) {
+    document.getElementById('is-admin').checked = true;
+    document.getElementById('admin-username').value = p.adminName || 'admin';
+    onAdminToggle();
+  }
+  termLog(`Preset loaded: ${name.replace(/_/g,' ').toUpperCase()}`, 'info');
+}
+
+// ── BUILD PAYLOAD ─────────────────────────────────────────────────────────────
+function buildPayload() {
+  const l = state.currentLayer;
+  if (l === 'network') return {
+    layer: 'network',
+    src_ip: document.getElementById('n-src_ip').value,
+    dst_ip: document.getElementById('n-dst_ip').value,
+    proto:  document.getElementById('n-proto').value,
+    sbytes: +document.getElementById('n-sbytes').value,
+    dbytes: +document.getElementById('n-dbytes').value,
+    rate:   +document.getElementById('n-rate').value,
+    dur:    +document.getElementById('n-dur').value,
+    failed_login_rate_60s: +document.getElementById('n-failed').value,
+    beacon_jitter_pct:     +document.getElementById('n-jitter').value,
+    is_external_dst: !document.getElementById('n-dst_ip').value.startsWith('10.')
+  };
+  if (l === 'endpoint') return {
+    layer: 'endpoint',
+    hostname:      document.getElementById('e-hostname').value,
+    username:      document.getElementById('e-username').value,
+    process_name:  document.getElementById('e-process_name').value,
+    parent_process:document.getElementById('e-parent_process').value,
+    event_type:    document.getElementById('e-event_type').value,
+    bytes_sent:    +document.getElementById('e-bytes_sent').value,
+    dst_ip:        document.getElementById('e-dst_ip').value,
+    dst_port:      +document.getElementById('e-dst_port').value,
+    is_external_dst: document.getElementById('e-is_ext').value === 'true',
+    src_ip: '10.0.0.' + Math.floor(Math.random()*254+1)
+  };
+  if (l === 'application') return {
+    layer: 'application',
+    src_ip:      document.getElementById('a-src_ip').value,
+    user_agent:  document.getElementById('a-user_agent').value,
+    method:      document.getElementById('a-method').value,
+    endpoint:    document.getElementById('a-endpoint').value,
+    status_code: +document.getElementById('a-status_code').value,
+    payload_size:+document.getElementById('a-payload_size').value,
+    geo_country: document.getElementById('a-geo_country').value,
+    user_id:     document.getElementById('a-user_id').value,
+    is_external_dst: true
+  };
+}
+
+// ── CROSS-LAYER TRACKING ──────────────────────────────────────────────────────
+function updateLayerWindow(layer, score) {
+  state.pendingLayerScores[layer] = score;
+  // Expire after 10 seconds
+  setTimeout(() => { delete state.pendingLayerScores[layer]; }, 10000);
+}
+
+function getLayerResults() {
+  return {
+    network:     state.pendingLayerScores.network     ?? null,
+    endpoint:    state.pendingLayerScores.endpoint    ?? null,
+    application: state.pendingLayerScores.application ?? null,
+  };
+}
+
+// ── SUBMIT EVENT ──────────────────────────────────────────────────────────────
+async function submitEvent() {
+  const payload = buildPayload();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.classList.add('loading'); btn.textContent = 'ANALYZING...';
+  termLog(`Ingesting ${state.currentLayer} event...`, 'info');
+  const t0 = performance.now();
+
+  try {
+    let data;
+    if (state.connected) {
+      // Try real backend
+      const res = await fetch(`${state.apiUrl}/ingest/${state.currentLayer}`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      data = await res.json();
+      data._processingMs = Math.round(performance.now() - t0);
+    } else {
+      // Offline fusion
+      data = computeOfflineFusion(payload, t0);
+    }
+    showResult(data, payload);
+    addAlert(data, payload);
+    termLog(`${data.incident.attack_cat} — ${data.incident.severity} [${data.incident.score}]${data.incident.cross_layer_boosted?' [CROSS-LAYER +20%]':''}${data.incident.fp_capped?' [FP CAPPED]':''}`, data.incident.severity === 'Critical' ? 'err' : data.incident.severity === 'High' ? 'warn' : 'ok');
+  } catch(e) {
+    termLog(`Error: ${e.message}`, 'err');
+    // Fallback to offline
+    const data = computeOfflineFusion(payload, t0);
+    showResult(data, payload);
+    addAlert(data, payload);
+    termLog(`Offline fallback: ${data.incident.attack_cat} — ${data.incident.severity}`, 'warn');
+  } finally {
+    btn.disabled=false; btn.classList.remove('loading'); btn.textContent='▶ ANALYZE THREAT';
+  }
+}
+
+function computeOfflineFusion(event, t0) {
+  const rules = runRuleEngine(event);
+  const mlProb = estimateMLProb(event);
+  updateLayerWindow(event.layer || state.currentLayer, mlProb);
+  const layerResults = getLayerResults();
+  const shap = generateShap(event, rules[0]?.attack_cat || 'Normal');
+  const fusion = computeFusionLocally(rules, mlProb, layerResults, event, shap);
+  showOverrideWhen(fusion.ruleFired);
+
+  return {
+    incident: {
+      score: fusion.score,
+      raw_score: fusion.rawScore,
+      severity: fusion.severity,
+      rule_fired: fusion.ruleFired,
+      ml_probability: fusion.mlProbability,
+      layer_count: fusion.layerCount,
+      is_fp_candidate: fusion.isFpCandidate,
+      fp_capped: fusion.fpCapped,
+      mitre_tag: fusion.mitreTag,
+      attack_cat: fusion.attackCat,
+      cross_layer_boosted: fusion.crossLayerBoosted,
+      layer_boost: fusion.layerBoost,
+      active_layers: fusion.activeLayers
+    },
+    explanation: { top_features: fusion.explanationFeatures },
+    playbook: generatePlaybook(fusion.attackCat, fusion.severity, event),
+    processing_ms: Math.round(performance.now() - t0),
+    _processingMs: Math.round(performance.now() - t0)
+  };
+}
+
+// ── PLAYBOOKS ─────────────────────────────────────────────────────────────────
+function generatePlaybook(cat, severity, event) {
+  const playbooks = {
+    'Brute Force': `[IMMEDIATE]\n1. Block source IP ${event.src_ip||'attacker'} at perimeter firewall\n2. Lock affected accounts and require password reset\n3. Enable MFA enforcement for all auth endpoints\n4. Alert identity team — check for successful auths in ±30min window\n\n[SHORT-TERM]\n5. Deploy CAPTCHA / rate-limit middleware\n6. Review auth logs across all services for same source\n7. Correlate with endpoint layer for post-compromise activity`,
+
+    'C2 Beaconing': `[IMMEDIATE]\n1. Isolate endpoint communicating with ${event.dst_ip||'C2 server'}\n2. Block egress to flagged IP at DNS and firewall layers\n3. Capture full packet capture for forensics (tcpdump/Wireshark)\n4. Activate Incident Response team — potential active breach\n\n[SHORT-TERM]\n5. Threat hunt for implant: check scheduled tasks, autoruns, DLL injection\n6. Query EDR for process ancestry of suspicious traffic source\n7. Revoke credentials of users on affected host`,
+
+    'Data Exfil': `[IMMEDIATE]\n1. Block egress traffic to ${event.dst_ip||'external destination'} immediately\n2. Preserve forensic state — do NOT wipe or reimage yet\n3. Identify what data was transferred — classify sensitivity\n4. Notify Data Protection Officer (GDPR/regulatory obligation)\n\n[SHORT-TERM]\n5. Audit DLP policies — add volume-based egress rules\n6. Review all outbound sessions in ±2hr window from same host\n7. Engage Legal if PII/financial data may have been exfiltrated`,
+
+    'Lateral Movement': `[IMMEDIATE]\n1. Sever network connection between ${event.src_ip||'source'} and ${event.dst_ip||'target'}\n2. Freeze accounts active on both endpoints\n3. Check ${event.src_ip||'source'} for initial compromise vector\n4. Snapshot both hosts for forensic analysis\n\n[SHORT-TERM]\n5. Hunt for admin share enumeration and WMI/PsExec artifacts\n6. Review Active Directory for unusual privilege escalation\n7. Segment affected subnet until root cause identified`,
+
+    'SQLi / Inject': `[IMMEDIATE]\n1. Block source IP ${event.src_ip||'attacker'} at WAF\n2. Put ${event.endpoint||'affected endpoint'} behind emergency maintenance page\n3. Review DB query logs for successful injection results\n4. Check for data exfiltration via OOB (DNS/HTTP callbacks)\n\n[SHORT-TERM]\n5. Deploy parameterized queries across all affected endpoints\n6. Run SAST scan on codebase for other injection vectors\n7. Rotate DB credentials as precaution`,
+
+    'Account Takeover': `[IMMEDIATE]\n1. Force logout and session revocation for affected user\n2. Reset credentials and invalidate all active tokens\n3. Enable step-up MFA for next 48 hours\n4. Review recent actions taken under compromised session\n\n[SHORT-TERM]\n5. Check for credential dump sources (breach databases)\n6. Audit OAuth grants and third-party app access\n7. Alert user via out-of-band channel (phone/secondary email)`,
+
+    'False Positive': `[REVIEW]\nThis event matches known-safe admin profile.\nNo action required — event baseline-noted.\n\nVerify: Is ${event.username||'user'}'s bulk transfer authorized?\nIf unexpected, escalate to Tier-2 SOC for manual review.`,
+
+    'Normal': `[MONITOR]\nNo threat action required. Event within normal baseline.\nContinue passive monitoring. Score logged for ML retraining.`
+  };
+  return playbooks[cat] || playbooks['Normal'];
+}
+
+// ── SHOW RESULT ───────────────────────────────────────────────────────────────
+function showResult(data, payload) {
+  const { incident, explanation, playbook } = data;
+  const panel = document.getElementById('result-panel');
+  panel.style.display = 'block';
+
+  // Cross-layer badge
+  const clBadge = document.getElementById('cross-layer-badge');
+  if (incident.cross_layer_boosted) {
+    clBadge.style.display = 'block';
+    clBadge.textContent = `◆ CROSS-LAYER CORRELATION: +${(incident.layer_boost*100||20).toFixed(0)}% boost — layers: ${(incident.active_layers||[]).join(' + ')}`;
+    state.stats.cross++;
+    document.getElementById('stat-cross').textContent = state.stats.cross;
+  } else {
+    clBadge.style.display = 'none';
+  }
+
+  // FP override notice
+  const fpOverride = document.getElementById('fp-override-notice');
+  const isAdminOverride = document.getElementById('is-admin').checked && document.getElementById('override-fp-cap').checked;
+  fpOverride.style.display = isAdminOverride ? 'block' : 'none';
+
+  // Cat & MITRE
+  document.getElementById('res-cat').textContent   = incident.attack_cat || 'Unknown';
+  document.getElementById('res-mitre').textContent = `MITRE ${incident.mitre_tag || 'N/A'}`;
+
+  // FP badge
+  const fpBadge = document.getElementById('res-fp-badge');
+  fpBadge.style.display = incident.is_fp_candidate ? 'inline-block' : 'none';
+
+  // Severity
+  const sevEl = document.getElementById('res-sev');
+  sevEl.textContent = incident.severity;
+  sevEl.className = `severity-badge badge-${incident.severity.toUpperCase()}`;
+
+  // Gauge
+  const score = incident.score;
+  const scoreColor = score > 0.85 ? 'var(--critical)' : score > 0.60 ? 'var(--orange)' : score > 0.35 ? 'var(--yellow)' : 'var(--low)';
+  document.getElementById('gauge-fill').style.width = (score * 100) + '%';
+  document.getElementById('gauge-fill').style.background = scoreColor;
+  document.getElementById('gauge-val').style.color = scoreColor;
+  document.getElementById('gauge-val').textContent = score.toFixed(3);
+
+  // Threat message
+  const msgEl = document.getElementById('threat-message');
+  const msgText = document.getElementById('threat-msg-text');
+  if (incident.attack_cat && incident.attack_cat !== 'Normal') {
+    msgEl.style.display = 'block';
+    msgText.textContent = getDynamicMessage(incident.attack_cat, payload, score);
+    msgEl.style.borderColor = scoreColor.replace('var(--', '').replace(')','') === 'critical' ? 'rgba(255,45,85,0.3)' : 'rgba(0,229,255,0.2)';
+  } else {
+    msgEl.style.display = 'none';
+  }
+
+  // Details
+  document.getElementById('res-ml').textContent      = (incident.ml_probability * 100).toFixed(1) + '%';
+  document.getElementById('res-rule').textContent    = incident.rule_fired ? '✓ YES' : '✗ NO';
+  document.getElementById('res-layers').textContent  = `${incident.layer_count || 1} / 3`;
+  document.getElementById('res-time').textContent    = (data.processing_ms || data._processingMs || 0) + ' ms';
+  document.getElementById('res-raw-score').textContent = (incident.raw_score || score).toFixed(3);
+  document.getElementById('res-fp-capped').textContent = incident.fp_capped ? '⚠ YES (capped)' : incident.is_fp_candidate ? '⚠ CANDIDATE' : '—';
+  if (incident.fp_capped) document.getElementById('res-fp-capped').style.color = 'var(--yellow)';
+
+  // SHAP
+  const features = explanation?.top_features || [];
+  if (features.length > 0) {
+    document.getElementById('shap-section').style.display = 'block';
+    const maxVal = Math.max(...features.map(([,v]) => Math.abs(v)));
+    document.getElementById('shap-list').innerHTML = features.map(([name, val]) => {
+      const pct = maxVal > 0 ? (Math.abs(val) / maxVal * 100) : 0;
+      const col = val > 0 ? 'var(--red)' : 'var(--green)';
+      return `<div class="shap-row">
+        <div class="shap-label">${name.replace(/_/g,' ')}</div>
+        <div class="shap-bar-track"><div class="shap-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="shap-val" style="color:${col}">${val>0?'+':''}${val.toFixed(4)}</div>
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('shap-section').style.display = 'none';
+  }
+
+  // Playbook
+  if (playbook) {
+    document.getElementById('playbook-section').style.display = 'block';
+    document.getElementById('playbook-text').textContent = playbook;
+  } else {
+    document.getElementById('playbook-section').style.display = 'none';
+  }
+}
+
+// ── ADD ALERT ─────────────────────────────────────────────────────────────────
+function addAlert(data, payload) {
+  const { incident } = data;
+  const now = new Date().toTimeString().slice(0,8);
+  const sev = incident.severity.toUpperCase();
+
+  // Stats
+  state.stats.total++;
+  if (sev === 'CRITICAL') state.stats.critical++;
+  if (sev === 'HIGH')     state.stats.high++;
+  if (incident.is_fp_candidate && incident.fp_capped) state.stats.fp++;
+
+  document.getElementById('stat-total').textContent    = state.stats.total;
+  document.getElementById('stat-critical').textContent = state.stats.critical;
+  document.getElementById('stat-high').textContent     = state.stats.high;
+  document.getElementById('stat-fp').textContent       = state.stats.fp;
+
+  // Cat count
+  const cat = incident.attack_cat;
+  if (cat in state.cats) { state.cats[cat]++; updateCatBars(); }
+
+  // Feed
+  const feed = document.getElementById('alert-feed');
+  const empty = feed.querySelector('div[style*="text-align"]');
+  if (empty) empty.remove();
+
+  const scoreColor =
+    sev === 'CRITICAL' ? 'var(--critical)' :
+    sev === 'HIGH'     ? 'var(--high)'     :
+    sev === 'MEDIUM'   ? 'var(--yellow)'   : 'var(--low)';
+
+  const crossTag = incident.cross_layer_boosted ? ' · <span style="color:var(--purple)">⬡ CROSS-LAYER</span>' : '';
+  const fpTag = incident.fp_capped ? ' · <span style="color:var(--yellow)">⚠ FP CAP</span>' : '';
+
+  const el = document.createElement('div');
+  el.className = `alert-item sev-${sev}`;
+  el.innerHTML = `
+    <div class="alert-top">
+      <div class="alert-cat">${cat.toUpperCase()}</div>
+      <div class="alert-time">${now}</div>
+    </div>
+    <div class="alert-score-row">
+      <div class="mini-bar"><div class="mini-bar-fill" style="width:${incident.score*100}%;background:${scoreColor}"></div></div>
+      <div class="alert-score-text" style="color:${scoreColor}">${incident.score.toFixed(3)}</div>
+      <div class="severity-badge" style="font-family:'Orbitron',monospace;font-size:0.52rem;letter-spacing:0.12em;padding:2px 7px;border:1px solid ${scoreColor};color:${scoreColor};margin-left:5px">${sev}</div>
+    </div>
+    <div class="alert-layer">${(incident.active_layers||[state.currentLayer]).join('+').toUpperCase()} · MITRE ${incident.mitre_tag||'N/A'}${crossTag}${fpTag}</div>
+  `;
+  feed.insertBefore(el, feed.firstChild);
+  addMapDot(scoreColor);
+}
+
+function updateCatBars() {
+  const map = [['bf','Brute Force'],['c2','C2 Beaconing'],['ex','Data Exfil'],['lm','Lateral Movement'],['sq','SQLi / Inject'],['at','Account Takeover']];
+  const maxVal = Math.max(1, ...Object.values(state.cats));
+  map.forEach(([id, key]) => {
+    const cnt = state.cats[key] || 0;
+    const bar = document.getElementById(`bar-${id}`);
+    const num = document.getElementById(`cnt-${id}`);
+    if (bar) bar.style.width = (cnt/maxVal*100) + '%';
+    if (num) num.textContent = cnt;
+  });
+}
+
+// ── THREAT MAP ────────────────────────────────────────────────────────────────
+function initMap() {
+  const canvas = document.getElementById('map-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+  ctx.strokeStyle = 'rgba(0,229,255,0.06)'; ctx.lineWidth = 0.5;
+  for (let x=0; x<canvas.width; x+=18) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+  for (let y=0; y<canvas.height; y+=18) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(0,229,255,0.18)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(canvas.width/2,0); ctx.lineTo(canvas.width/2,canvas.height); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,canvas.height/2); ctx.lineTo(canvas.width,canvas.height/2); ctx.stroke();
+}
+
+function addMapDot(color) {
+  const canvas = document.getElementById('map-canvas');
+  const ctx = canvas.getContext('2d');
+  const x = Math.random() * canvas.width, y = Math.random() * canvas.height;
+  const rgb = color.includes('critical') ? '#ff2d55' : color.includes('orange') ? '#ff8c00' : color.includes('yellow') ? '#ffd700' : color.includes('low') ? '#00e5ff' : '#00ff88';
+  ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle=rgb; ctx.shadowBlur=10; ctx.shadowColor=rgb; ctx.fill(); ctx.shadowBlur=0;
+  let r=2, alpha=1;
+  function ripple() {
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.strokeStyle=`${rgb}${Math.floor(alpha*255).toString(16).padStart(2,'0')}`;
+    ctx.lineWidth=1; ctx.stroke();
+    r+=1.5; alpha-=0.05;
+    if (r<30) requestAnimationFrame(ripple);
+  }
+  ripple();
+}
+
+// ── SIMULATION ENGINE ─────────────────────────────────────────────────────────
+const SIM_SCENARIOS = [
+  {
+    name: 'BRUTE FORCE WAVE',
+    layer: 'network',
+    gen: () => ({
+      layer:'network', src_ip: randomExtIP(), dst_ip:'10.0.1.5',
+      proto:'tcp', sbytes:800+Math.random()*500, dbytes:200,
+      rate:10+Math.random()*20, dur:0.1, is_external_dst:true,
+      failed_login_rate_60s: 6+Math.floor(Math.random()*10),
+      beacon_jitter_pct:100
+    })
+  },
+  {
+    name: 'C2 BEACON ACTIVE',
+    layer: 'network',
+    gen: () => ({
+      layer:'network', src_ip:'192.168.'+randN(1,10)+'.'+randN(2,50),
+      dst_ip: randomExtIP(), proto:'tcp',
+      sbytes:300+Math.random()*300, dbytes:80+Math.random()*80,
+      rate:0.01+Math.random()*0.05, dur:90+Math.random()*60,
+      is_external_dst:true, failed_login_rate_60s:0,
+      beacon_jitter_pct: 1+Math.random()*3
+    })
+  },
+  {
+    name: 'DATA EXFIL BURST',
+    layer: 'network',
+    gen: () => ({
+      layer:'network', src_ip:'10.'+randN(0,5)+'.'+randN(1,10)+'.'+randN(2,50),
+      dst_ip:randomExtIP(), proto:'tcp',
+      sbytes:5000000+Math.random()*8000000, dbytes:500,
+      rate:400+Math.random()*200, dur:60+Math.random()*60,
+      is_external_dst:true, failed_login_rate_60s:0, beacon_jitter_pct:100
+    })
+  },
+  {
+    name: 'LATERAL MOVEMENT',
+    layer: 'endpoint',
+    gen: () => ({
+      layer:'endpoint', hostname:'WORKSTATION-'+randN(1,20).toString().padStart(3,'0'),
+      username:['jdoe','msmith','rjones'][randN(0,2)],
+      process_name:['cmd.exe','wscript.exe','mshta.exe'][randN(0,2)],
+      parent_process:'explorer.exe', event_type:'network_connect',
+      bytes_sent:5000+Math.random()*20000, dst_ip:'10.0.'+randN(0,5)+'.'+randN(2,50),
+      dst_port:[445,135,3389][randN(0,2)], is_external_dst:false,
+      src_ip:'10.0.0.'+randN(2,50)
+    })
+  },
+  {
+    name: 'SQLI PROBE',
+    layer: 'application',
+    gen: () => ({
+      layer:'application', src_ip:randomExtIP(),
+      user_agent:'sqlmap/1.7 (https://sqlmap.org)',
+      method:'POST', endpoint:["/api/users?id=1 OR 1=1","/?q=1' UNION SELECT--","/login?user=admin'--"][randN(0,2)],
+      status_code:[200,500][randN(0,1)], payload_size:800+Math.random()*600,
+      geo_country:['RU','CN','KP'][randN(0,2)], user_id:'anonymous',
+      is_external_dst:true
+    })
+  },
+  {
+    name: 'ADMIN BULK XFER (FP)',
+    layer: 'endpoint',
+    gen: () => ({
+      layer:'endpoint', hostname:'BACKUP-SERVER',
+      username:'backup_user', process_name:'robocopy.exe',
+      parent_process:'taskschd.exe', event_type:'file_transfer',
+      bytes_sent:500000+Math.random()*200000,
+      dst_ip:'192.168.1.200', dst_port:445, is_external_dst:false,
+      src_ip:'192.168.1.100'
+    })
+  },
+  {
+    name: 'MULTI-LAYER THREAT',
+    layer: 'network',
+    gen: () => {
+      // Trigger cross-layer by pumping both network and endpoint in quick succession
+      setTimeout(() => {
+        const epEvent = {
+          layer:'endpoint', hostname:'WORKSTATION-005',
+          username:'jdoe', process_name:'powershell.exe',
+          parent_process:'winword.exe', event_type:'network_connect',
+          bytes_sent:50000, dst_ip:randomExtIP(), dst_port:443,
+          is_external_dst:true, src_ip:'10.0.0.5'
+        };
+        processSimEvent(epEvent);
+      }, 800);
+      return {
+        layer:'network', src_ip:'10.0.0.5', dst_ip:randomExtIP(),
+        proto:'tcp', sbytes:50000, dbytes:200,
+        rate:5, dur:30, is_external_dst:true,
+        failed_login_rate_60s:0, beacon_jitter_pct:3
+      };
+    }
+  }
+];
+
+function randN(a, b) { return Math.floor(Math.random()*(b-a+1))+a; }
+function randomExtIP() { return `${randN(1,254)}.${randN(0,255)}.${randN(0,255)}.${randN(1,254)}`; }
+
+let simScenarioIdx = 0;
+
+function toggleSimulation() {
+  if (state.simRunning) stopSimulation();
+  else startSimulation();
+}
+
+function startSimulation() {
+  state.simRunning = true;
+  document.getElementById('sim-bar').classList.add('active');
+  document.getElementById('sim-dot').style.background = 'var(--green)';
+  document.getElementById('sim-dot').classList.add('online');
+  document.getElementById('sim-label').textContent = 'SIM LIVE';
+  document.getElementById('sim-toggle-btn').textContent = '■ STOP SIM';
+  termLog('Real-time threat simulation started', 'info');
+  scheduleNext();
+}
+
+function stopSimulation() {
+  state.simRunning = false;
+  clearTimeout(state.simTimeout);
+  document.getElementById('sim-bar').classList.remove('active');
+  document.getElementById('sim-dot').style.background = 'var(--text-dim)';
+  document.getElementById('sim-dot').classList.remove('online');
+  document.getElementById('sim-label').textContent = 'SIM IDLE';
+  document.getElementById('sim-toggle-btn').textContent = '▶ SIMULATE';
+  termLog('Simulation stopped', 'warn');
+}
+
+function updateSimSpeed() {
+  const val = +document.getElementById('sim-speed').value;
+  state.simSpeed = val;
+  document.getElementById('sim-speed-val').textContent = (val/1000).toFixed(1) + 's';
+}
+
+function scheduleNext() {
+  if (!state.simRunning) return;
+  const jitter = (Math.random() * 0.4 + 0.8) * state.simSpeed;
+  state.simTimeout = setTimeout(() => {
+    if (state.simRunning) { runSimStep(); scheduleNext(); }
+  }, jitter);
+}
+
+function runSimStep() {
+  const scenario = SIM_SCENARIOS[simScenarioIdx % SIM_SCENARIOS.length];
+  simScenarioIdx++;
+  const event = scenario.gen();
+  document.getElementById('sim-scenario-name').textContent = scenario.name;
+  state.simEventCount++;
+  document.getElementById('sim-event-count').textContent = `events: ${state.simEventCount}`;
+  processSimEvent(event);
+}
+
+function processSimEvent(event) {
+  const t0 = performance.now();
+  const prevLayer = state.currentLayer;
+  state.currentLayer = event.layer;
+
+  const rules = runRuleEngine(event);
+  const mlProb = estimateMLProb(event);
+  updateLayerWindow(event.layer, mlProb);
+  const layerResults = getLayerResults();
+  const shap = generateShap(event, rules[0]?.attack_cat || 'Normal');
+  const fusion = computeFusionLocally(rules, mlProb, layerResults, event, shap);
+
+  const data = {
+    incident: {
+      score: fusion.score, raw_score: fusion.rawScore,
+      severity: fusion.severity, rule_fired: fusion.ruleFired,
+      ml_probability: fusion.mlProbability, layer_count: fusion.layerCount,
+      is_fp_candidate: fusion.isFpCandidate, fp_capped: fusion.fpCapped,
+      mitre_tag: fusion.mitreTag, attack_cat: fusion.attackCat,
+      cross_layer_boosted: fusion.crossLayerBoosted,
+      layer_boost: fusion.layerBoost, active_layers: fusion.activeLayers
+    },
+    explanation: { top_features: fusion.explanationFeatures },
+    playbook: generatePlaybook(fusion.attackCat, fusion.severity, event),
+    processing_ms: Math.round(performance.now() - t0)
+  };
+
+  showResult(data, event);
+  addAlert(data, event);
+
+  const lvl = fusion.severity === 'Critical' ? 'err' : fusion.severity === 'High' ? 'warn' : 'ok';
+  termLog(`[SIM] ${event.layer.toUpperCase()} → ${fusion.attackCat} ${fusion.severity} [${fusion.score}]${fusion.crossLayerBoosted?' +CROSS':''}`, lvl);
+  state.currentLayer = prevLayer;
+}
+
+// ── GUIDE ─────────────────────────────────────────────────────────────────────
+function toggleGuide() {
+  const p = document.getElementById('guide-panel');
+  p.classList.toggle('show');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  initMap();
+  setTimeout(testConnection, 600);
+});
+window.addEventListener('resize', () => {
+  const c = document.getElementById('map-canvas');
+  c.width = c.offsetWidth; c.height = c.offsetHeight; initMap();
+});
+</script>
+</body>
+</html>

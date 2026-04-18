@@ -1,0 +1,38 @@
+
+==============================================================
+  ENDPOINT EVALUATION REPORT
+==============================================================
+
+
+  [A] LightGBM Classifier (primary):
+  Accuracy                               0.9522 [OK]
+  F1 (weighted)                          0.9509 [OK]
+  AUC-ROC                                0.9394 [OK]
+  False Positive Rate                    0.0000
+  False Negative Rate                    0.1591
+
+  [B] Isolation Forest (standalone anomaly detector):
+    F1: 0.6257  |  FPR: 0.1253
+    Note: IF trains on normal-only, detects novel anomalies
+
+  Classification Report:
+              precision    recall  f1-score   support
+
+      Normal       0.94      1.00      0.97      6995
+      Attack       1.00      0.84      0.91      3005
+
+    accuracy                           0.95     10000
+   macro avg       0.97      0.92      0.94     10000
+weighted avg       0.96      0.95      0.95     10000
+
+  Per Attack Category:
+    Brute Force               F1=0.893  n=1002
+    Normal                    F1=0.000  n=6995
+    Lateral Movement          F1=0.999  n=1002
+    Data Exfil                F1=0.989  n=511
+    C2 Beaconing              F1=0.616  n=490
+
+  NOTE: C2 Beaconing has lowest F1 by design - low-volume periodic
+  connections are subtle. Real improvement: add jitter/interval features.
+
+  Admin FP Check: 110 rows, 0 wrongly flagged

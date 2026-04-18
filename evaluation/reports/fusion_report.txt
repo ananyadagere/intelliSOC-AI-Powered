@@ -1,0 +1,28 @@
+
+==============================================================
+  FUSION REPORT
+==============================================================
+
+  Formula: score = 0.4 x rule_hit + 0.6 x ml_probability
+  Cross-layer boost: +0.2 per additional corroborating layer (capped 1.0)
+
+  Metric                  ML Only     Fusion
+  --------------------------------------------
+  F1 Score                 0.9511     0.9301
+  AUC-ROC                  0.9905     0.9905
+
+  Threshold sweep (fusion score):
+   Threshold       F1      FPR      FNR  Severity
+  ----------------------------------------------------
+        0.30   0.9511   0.0339   0.0757  [Low]
+        0.35   0.9465   0.0222   0.0902  [Medium] <- boundary
+        0.40   0.9409   0.0126   0.1052  [Medium]
+        0.45   0.9343   0.0078   0.1194  [Medium]
+        0.50   0.9301   0.0054   0.1280  [Medium]
+        0.55   0.9301   0.0054   0.1280  [Medium]
+        0.60   0.9301   0.0054   0.1280  [High] <- boundary
+        0.65   0.9301   0.0054   0.1280  [High]
+        0.70   0.9301   0.0054   0.1280  [High]
+        0.75   0.9301   0.0054   0.1280  [High]
+        0.80   0.9301   0.0054   0.1280  [High]
+        0.85   0.9301   0.0054   0.1280  [Critical] <- boundary
