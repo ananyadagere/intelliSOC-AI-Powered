@@ -29,7 +29,6 @@ Each script saves .pkl files in the corresponding models/ subfolder.
 
 ### 4. Run the API
 ```bash
-export ANTHROPIC_API_KEY=your_key
 uvicorn api.main:app --reload --port 8000
 ```
 
